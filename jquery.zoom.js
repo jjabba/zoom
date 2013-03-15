@@ -9,11 +9,17 @@
 		callback: false,
 		target: false,
 		duration: 120,
-		on: 'mouseover' // other options: 'grab', 'click', 'toggle'
+		on: 'mouseover', // other options: 'grab', 'click', 'toggle'
+		zoomOptions: {
+			maxlevel: 1.0, // Between 1.0 and 5.0. Where 1.0 denotes 'natural size'
+			width: Math.infinity,
+			height: Math.infinity,
+			maintainAspectRatio: true // zoom.width & zoom.height will be recalculated accordingly if true
+		}
 	};
 
 	// Core Zoom Logic, independent of event listeners.
-	$.zoom = function(target, source, img) {
+	$.zoom = function(target, source, img, settings) {
 		var outerWidth,
 			outerHeight,
 			xRatio,
@@ -27,6 +33,35 @@
 			overflow: 'hidden'
 		});
 
+		// Calculate zoomed image dimentions
+		var w = settings.zoomOptions.level > 1.0 ? Math.round( w * Math.min(5, Math.max( 1, settings.zoomOptions.level)) ) : img.naturalWidth;
+		var h = settings.zoomOptions.level > 1.0 ? Math.round( h * Math.min(5, Math.max( 1, settings.zoomOptions.level)) ) : img.naturalHeight;
+
+		if( settings.zoomOptions.maintainAspectRatio ) {
+			if( isFinite(settings.zoomOptions.width) && !isFinite(settings.zoomOptions.height) ){
+				// re-size with respect to width, maintaining aspect ratio
+				var scalefactor = Math.round( settings.zoomOptions.width/img.naturalWidth );
+				w = Math.round(settings.zoomOptions.width);
+				h = Math.round(img.naturalHeight * scalefactor);
+
+			}else if( isFinite(settings.zoomOptions.height) && !isFinite(settings.zoomOptions.width)){
+				// re-size with respect to height, maintaining aspect ratio
+				var scalefactor = Math.round( settings.zoomOptions.height/img.naturalHeight );
+				h = Math.round(settings.zoomOptions.height);
+				w = Math.round(img.naturalWidth * scalefactor);
+
+			}else if(isFinite(settings.zoomOptions.width) && isFinite(settings.zoomOptions.height)){
+				// width and height specified (honor aspect ratio). Let's find limiting factor.
+				var scalefactor = Math.min( (Math.round( settings.zoomOptions.width/img.naturalWidth )), (Math.round( settings.zoomOptions.height/img.naturalHeight )))
+				w = Math.round(scalefactor * img.naturalWidth)
+				h = Math.round(scalefactor * img.naturalHeight);
+			}
+		}else{
+			// simply force the zoom size independently for width and height (if they are set...)
+			w = isFinite(settings.zoomOptions.width)  ? settings.zoomOptions.width  : w;
+			h = isFinite(settings.zoomOptions.height) ? settings.zoomOptions.height : h;
+		}
+
 		$(img)
 			.addClass('zoomImg')
 			.css({
@@ -34,8 +69,8 @@
 				top: 0,
 				left: 0,
 				opacity: 0,
-				width: img.width,
-				height: img.height,
+				width:  w,
+				height: h,
 				border: 'none',
 				maxWidth: 'none'
 			})
@@ -65,7 +100,7 @@
 	$.fn.zoom = function (options) {
 		return this.each(function () {
 			var
-			settings = $.extend({}, defaults, options || {}),
+			settings = $.extend(true, {}, defaults, options || {}),
 			//target will display the zoomed iamge
 			target = settings.target || this,
 			//source will provide zoom location info (thumbnail)
@@ -84,7 +119,7 @@
 			}
 
 			img.onload = function () {
-				var zoom = $.zoom(target, source, img);
+				var zoom = $.zoom(target, source, img, settings);
 
 				function start(e) {
 					zoom.init();
